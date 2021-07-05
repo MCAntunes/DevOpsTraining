@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-statefulset
+spec:
+  serviceName: mongodb-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: database
+  template:
+    metadata:
+      labels:
+        app: database
+        selector: mongodb-statefulset
+    spec:
+      containers:
+        - name: mongodb-container
+          image: mongo
+          ports:
+            - containerPort: 27017
+          command:
+          - "mongod"
+          - "--bind_ip"
+          - "::,0.0.0.0"
+          volumeMounts:
+            - name: mongodb-conf
+              mountPath: /config
+              readOnly: true
+            - name: mongodb-data
+              mountPath: /data/db
+      nodeSelector:
+        kubernetes.io/hostname: minikube
+      volumes:
+        - name: mongodb-conf
+          configMap:
+            name: mongodb-configmap
+            items:
+              - key: mongo.conf
+                path: mongo.conf
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: mongodb-persistent-volume-claim

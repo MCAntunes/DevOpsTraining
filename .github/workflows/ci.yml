@@ -1,0 +1,40 @@
+name: Test MongoDB Kubernetes Setup
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '0 10,18 * * *'
+  workflow_dispatch:
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+
+      - name: Setup K8S cluster
+        run: |
+          chmod +x ./setup_k8s.sh
+          ./setup_k8s.sh
+
+      - name: Test K8S cluster
+        run: |
+          mongo mongodb://$(minikube service --url mongodb-service | sed s@http://@@ ) --eval "db.adminCommand('listDatabases')"
+          pip install -r python_requirements.txt
+          python3 test_k8s.py --url $(minikube service --url mongodb-service) --firstTime
+
+      - name: Remove and add StatefulSet
+        run: |
+          kubectl delete statefulsets mongodb-statefulset
+          kubectl apply -f KubernetesConfig/statefulset.yaml
+
+      - name: Test K8S cluster again
+        run: |
+          python3 test_k8s.py --url $(minikube service --url mongodb-service)
